@@ -35,7 +35,7 @@ static void usage(const char *fmt, ...)
 	va_list ap;
 
 	fputs("usage: git stash list\n", stderr);
-	fputs("   or: git stash ( pop | apply | drop )\n", stderr);
+	fputs("   or: git stash ( pop | apply [index] [--force]| drop )\n", stderr);
 	fputs("   or: git stash [push]\n", stderr);
 	fputs("\n", stderr);
 
@@ -73,9 +73,15 @@ static void parse_subcommand(struct opts *opts, int argc, char *argv[])
 
 static int cmd_apply(git_repository *repo, struct opts *opts)
 {
+	git_stash_apply_options stash_apply_opts = GIT_STASH_APPLY_OPTIONS_INIT;
 	unsigned long index = strtoul(opts->argc ? opts->argv[2] : "0", NULL, 10);
 	printf("Applying index: %lu\n", index);
-	check_lg2(git_stash_apply(repo, index, NULL),
+	if ((opts->argc > 1) && !strcmp(opts->argv[3], "--force"))
+	{
+		printf("Applying with force checkout strategy\n");
+		stash_apply_opts.checkout_options.checkout_strategy = GIT_CHECKOUT_FORCE | GIT_CHECKOUT_ALLOW_CONFLICTS;
+	}
+	check_lg2(git_stash_apply(repo, index, &stash_apply_opts),
 		  "Unable to apply stash", NULL);
 
 	return 0;

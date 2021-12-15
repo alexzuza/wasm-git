@@ -255,4 +255,77 @@ describe('wasm-git', function () {
         assert.isTrue(stashListOutput.split('\n').length === 1);
         assert.isTrue(stashListOutput.startsWith('stash@{0}:'));
     });
+
+    it('should apply stashed changes', async() => {
+        assert.equal((await callWorker('deletelocal')).deleted, 'testrepo.git');
+        worker.terminate();
+        await createWorker();
+        assert.isTrue((await callWorker('synclocal', {url: `${location.origin}/testrepo.git`, newrepo: true })).empty);
+
+        await callWorkerWithArgs('init', '.');
+        await callWorker(
+            'writefile', {
+                filename: 'test.txt',
+                contents: 'hello world'
+            });
+        await callWorkerWithArgs('add', 'test.txt');
+        await callWorkerWithArgs('commit', '-m', 'initial commit');
+
+        await callWorkerWithArgs('checkout', '-b', 'master2');
+        await callWorker(
+            'writefile', {
+                filename: 'test.txt',
+                contents: 'hello world 2'
+            });
+        await callWorkerWithArgs('add', 'test.txt');
+        await callWorkerWithArgs('commit', '-m', 'initial commit');
+
+        await callWorkerWithArgs('checkout', 'master');
+
+        await callWorker(
+            'writefile', {
+                filename: 'test.txt',
+                contents: 'hello world 23'
+            });
+        let file = await callWorker('readfile', { filename: 'test.txt' });
+        assert.isTrue(file.filecontents === 'hello world 23');
+
+        await callWorker('stash');
+        file = await callWorker('readfile', { filename: 'test.txt' });
+        assert.isTrue(file.filecontents === 'hello world');
+
+        await callWorkerWithArgs('checkout', 'master2');
+
+        file = await callWorker('readfile', { filename: 'test.txt' });
+        assert.isTrue(file.filecontents === 'hello world 2');
+
+        await callWorker(
+            'writefile', {
+                filename: 'test.txt',
+                contents: 'hello world 34'
+            });
+        file = await callWorker('readfile', { filename: 'test.txt' });
+        assert.isTrue(file.filecontents === 'hello world 34');
+
+        await callWorker('stash');
+        file = await callWorker('readfile', { filename: 'test.txt' });
+        assert.isTrue(file.filecontents === 'hello world 2');
+
+        await callWorkerWithArgs('checkout', 'master');
+        const stashes = (await callWorkerWithArgs('stash', 'list')).stdout;
+        assert.isTrue(stashes.split('\n').length === 2)
+
+        await callWorkerWithArgs('stash', 'apply', '1');
+        file = await callWorker('readfile', { filename: 'test.txt' });
+        assert.isTrue(file.filecontents === 'hello world 23');
+
+        const err = (await callWorkerWithArgs('stash', 'apply', '0')).stderr;
+        assert.isTrue(err === 'Unable to apply stash [-13] - 1 conflict prevents checkout');
+
+        const forceOutput = (await callWorkerWithArgs('stash', 'apply', '0', '--force'));
+        assert.isTrue(forceOutput.stdout === ['Applying index: 0', 'Applying with force checkout strategy'].join('\n'));
+
+        const status = (await callWorkerWithArgs('status')).stdout;
+        assert.isTrue(status === '# On branch master\nconflict: a:test.txt o:test.txt t:test.txt');
+    });
 });
