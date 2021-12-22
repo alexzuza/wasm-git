@@ -328,4 +328,35 @@ describe('wasm-git', function () {
         const status = (await callWorkerWithArgs('status')).stdout;
         assert.isTrue(status === '# On branch master\nconflict: a:test.txt o:test.txt t:test.txt');
     });
+
+    it('should read file by using cat-file', async() => {
+        assert.equal((await callWorker('deletelocal')).deleted, 'testrepo.git');
+        worker.terminate();
+        await createWorker();
+        assert.isTrue((await callWorker('synclocal', {url: `${location.origin}/testrepo.git`, newrepo: true })).empty);
+
+        await callWorkerWithArgs('init', '.');
+        await callWorker(
+            'writefile', {
+                filename: 'test.txt',
+                contents: `hello world`
+            });
+        await callWorker(
+            'writefile', {
+                filename: 'test2.txt',
+                contents: `hello world
+`
+            });
+
+        await callWorkerWithArgs('add', '.');
+        await callWorkerWithArgs('commit', '-m', 'initial commit');
+
+        const hash1 = (await callWorkerWithArgs('rev-parse', 'master:test.txt')).stdout;
+        const hash2 = (await callWorkerWithArgs('rev-parse', 'master:test2.txt')).stdout;
+        const content1 = (await callWorkerWithArgs('cat-file', '-p', hash1)).stdout;
+        const content2 = (await callWorkerWithArgs('cat-file', '-p', hash2)).stdout;
+        assert.isTrue(content1 === 'hello world');
+        assert.isTrue(content2 === `hello world
+`);
+    });
 });
