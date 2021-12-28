@@ -14,49 +14,71 @@
 
 #include "common.h"
 
+struct push_opts {
+	char* refspec;
+};
+static void parse_opts(struct push_opts* o, int argc, char* argv[]);
+
+static void print_usage(void)
+{
+	fprintf(stderr, "usage:\n"
+		"push (without arguments pushes to the current HEAD)\n"
+		"push <refspec>\n");
+	exit(1);
+}
 /**
  * This example demonstrates the libgit2 push API to roughly
  * simulate `git push`.
- *
- * This does not have:
- *
- * - Robust error handling
- * - Any of the `git push` options
- *
- * This does have:
- *
- * - Example of push to origin/master
- * 
  */
 
-/** Entry point for this command */
-int lg2_push(git_repository *repo, int argc, char **argv) {
+ /** Entry point for this command */
+int lg2_push(git_repository* repo, int argc, char** argv) {
+	struct push_opts opt;
 	git_push_options options;
 	git_remote* remote = NULL;
-	char *refspec = NULL;
-	git_reference* head_ref;
-	
-	git_reference_lookup(&head_ref, repo, "HEAD");
-	refspec = git_reference_symbolic_target(head_ref);
+	char* refspec = NULL;
+	git_reference* head_ref = NULL;
+
+	parse_opts(&opt, argc, argv);
+
+	if (opt.refspec)
+	{
+		refspec = opt.refspec;
+	}
+	else
+	{
+		git_reference_lookup(&head_ref, repo, "HEAD");
+		refspec = git_reference_symbolic_target(head_ref);
+	}
 
 	const git_strarray refspecs = {
 		&refspec,
 		1
 	};
+	check_lg2(git_remote_lookup(&remote, repo, "origin"), "Unable to lookup remote", NULL);
 
-    /* Validate args */
-	if (argc > 1) {
-		printf ("USAGE: %s\n\nsorry, no arguments supported yet\n", argv[0]);
-		return -1;
-	}
-
-	check_lg2(git_remote_lookup(&remote, repo, "origin" ), "Unable to lookup remote", NULL);
-	
-	check_lg2(git_push_options_init(&options, GIT_PUSH_OPTIONS_VERSION ), "Error initializing push", NULL);
+	check_lg2(git_push_options_init(&options, GIT_PUSH_OPTIONS_VERSION), "Error initializing push", NULL);
 
 	check_lg2(git_remote_push(remote, &refspecs, &options), "Error pushing", NULL);
+	printf("Successfully pushed to %s\n", refspec);
 
-	printf("pushed\n");
 	git_reference_free(head_ref);
+
 	return 0;
+}
+
+/**
+ * Parse options that git's push command supports.
+ */
+static void parse_opts(struct push_opts* opt, int argc, char* argv[])
+{
+	memset(opt, 0, sizeof(*opt));
+
+	if (argc == 1)
+		return;
+
+	if (argc > 2)
+		print_usage();
+
+	opt->refspec = argv[1];
 }

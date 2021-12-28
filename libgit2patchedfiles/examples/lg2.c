@@ -12,6 +12,7 @@ struct {
 } commands[] = {
 	{ "add",          lg2_add,          1 },
 	{ "blame",        lg2_blame,        1 },
+	{ "branch",       lg2_branch,       1 },
 	{ "cat-file",     lg2_cat_file,     1 },
 	{ "checkout",     lg2_checkout,     1 },
 	{ "clone",        lg2_clone,        0 },
