@@ -5,10 +5,11 @@
 #include "common.h"
 
 struct branch_opts {
-	int move;
-	int delete;
-	char* branch1;
-	char* branch2;
+    int move;
+    int delete;
+    int set_upstream;
+    char* branch1;
+    char* branch2;
 };
 
 static void parse_opts(struct branch_opts* o, int argc, char* argv[]);
@@ -17,13 +18,15 @@ static void print_usage(void)
 {
 	fprintf(stderr, "usage:\n"
 		"branch -m <oldbranch> <newbranch>\n"
-		"branch -d <branch>\n");
+		"branch -d <branch>\n"
+		"branch -u <branch>\n");
 	exit(1);
 }
 
 /*
  * git branch -m [<oldbranch>] <newbranch>
  * git branch -d <branchname>
+ * git branch -u <branchname>
  */
 int lg2_branch(git_repository* repo, int argc, char* argv[])
 {
@@ -33,9 +36,17 @@ int lg2_branch(git_repository* repo, int argc, char* argv[])
 
 	parse_opts(&opt, argc, argv);
 
+	if (opt.set_upstream && opt.branch1)
+	{
+		git_repository_head(&branch1, repo);
+		check_lg2(git_branch_set_upstream(branch1, opt.branch1), "Error change upstream", NULL);
+		printf("current branch successfully changed upstream to %s\n", opt.branch1);
+		goto cleanup;
+	}
+
 	if (opt.branch1)
 	{
-		check_lg2(git_branch_lookup(&branch1, repo, opt.branch1, GIT_BRANCH_LOCAL), "Error branch lookup", NULL);
+	check_lg2(git_branch_lookup(&branch1, repo, opt.branch1, GIT_BRANCH_LOCAL), "Error branch lookup", NULL);
 	}
 
 	if (opt.delete && branch1)
@@ -50,6 +61,7 @@ int lg2_branch(git_repository* repo, int argc, char* argv[])
 		printf("%s branch was successfully renamed to %s\n", opt.branch1, opt.branch2);
 	}
 
+cleanup:
 	git_reference_free(branch1);
 	git_reference_free(new_ref);
 
@@ -69,22 +81,24 @@ static void parse_opts(struct branch_opts* opt, int argc, char* argv[])
 	memset(opt, 0, sizeof(*opt));
 
 	for (args.pos = 1; args.pos < argc; ++args.pos) {
-	char* a = argv[args.pos];
+		char* a = argv[args.pos];
 
-	if (a[0] != '-') {
-		if (!opt->branch1)
-			opt->branch1 = a;
-		else if (!opt->branch2)
-			opt->branch2 = a;
+		if (a[0] != '-') {
+			if (!opt->branch1)
+				opt->branch1 = a;
+			else if (!opt->branch2)
+				opt->branch2 = a;
+			else
+				print_usage();
+		}
+		else if (!strcmp(a, "-m"))
+			opt->move = 1;
+		else if (!strcmp(a, "-d"))
+			opt->delete = 1;
+		else if (!strcmp(a, "-u"))
+			opt->set_upstream = 1;
 		else
 			print_usage();
-	}
-	else if (!strcmp(a, "-m"))
-		opt->move = 1;
-	else if (!strcmp(a, "-d"))
-		opt->delete = 1;
-	else
-		print_usage();
 	}
 
 	if (opt->move && !opt->branch2)
