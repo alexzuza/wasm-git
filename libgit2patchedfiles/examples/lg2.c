@@ -39,6 +39,7 @@ struct {
 	{ "status",       lg2_status,       1 },
 	{ "tag",          lg2_tag,          1 },
 	{ "revert",       lg2_revert,       1 },
+	{ "merge-tree",   lg2_merge_tree,   1 },
 };
 
 static int run_command(git_command_fn fn, git_repository *repo, struct args_info args)
