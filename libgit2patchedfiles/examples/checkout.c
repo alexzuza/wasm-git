@@ -299,7 +299,7 @@ int lg2_checkout(git_repository *repo, int argc, char **argv)
 		git_checkout_options copts = GIT_CHECKOUT_OPTIONS_INIT;
 		git_strarray paths;
 
-		copts.checkout_strategy = GIT_CHECKOUT_FORCE;
+		copts.checkout_strategy = GIT_CHECKOUT_FORCE | GIT_CHECKOUT_REMOVE_UNTRACKED;
 
 		paths.count = args.argc - args.pos;
 
@@ -308,8 +308,11 @@ int lg2_checkout(git_repository *repo, int argc, char **argv)
 			return GIT_ERROR_INVALID;
 		}
 
-		paths.strings = &args.argv[args.pos];
-		copts.paths = paths;
+		if (strcmp(args.argv[args.pos], "."))
+		{
+			paths.strings = &args.argv[args.pos];
+			copts.paths = paths;
+		}
 
 		err = git_checkout_head(repo, &copts);
 		if (err != 0) {
