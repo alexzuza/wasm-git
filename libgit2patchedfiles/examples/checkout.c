@@ -291,11 +291,21 @@ int lg2_checkout(git_repository *repo, int argc, char **argv)
 		}
 	}
 
-	if (match_arg_separator(&args)) {
+    if (match_arg_separator(&args) || strcmp(argv[args.pos + 1], "--") == 0) {
 		/**
 		 * Try to checkout the given path(s)
 		 */
 
+		if (strcmp(argv[args.pos + 1], "--") == 0)
+		{
+			err = git_revparse_ext(&target_obj, &branch_ref, repo, argv[args.pos]);
+			if (err != 0) {
+				fprintf(stderr, "error: %s\n", git_error_last()->message);
+				goto cleanup;
+			}
+			args.opts_done = 1;
+			args.pos+=2;
+		}
 		git_checkout_options copts = GIT_CHECKOUT_OPTIONS_INIT;
 		git_strarray paths;
 
@@ -314,7 +324,15 @@ int lg2_checkout(git_repository *repo, int argc, char **argv)
 			copts.paths = paths;
 		}
 
-		err = git_checkout_head(repo, &copts);
+		if (target_obj)
+		{
+			err = git_checkout_tree(repo, git_object_id(target_obj), &copts);
+		}
+		else
+		{
+			err = git_checkout_head(repo, &copts);
+		}
+
 		if (err != 0) {
 			fprintf(stderr, "error: %s\n", git_error_last()->message);
 		}
