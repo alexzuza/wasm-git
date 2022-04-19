@@ -56,6 +56,7 @@ struct log_options {
 	git_time_t before;
 	git_time_t after;
 	const char *author;
+	const char *excludeAuthor;
 	const char *committer;
 	const char *grep;
 };
@@ -133,6 +134,9 @@ int lg2_log(git_repository *repo, int argc, char *argv[])
 		}
 
 		if (!signature_matches(git_commit_author(commit), opt.author))
+			continue;
+
+		if (opt.excludeAuthor && signature_matches(git_commit_author(commit), opt.excludeAuthor))
 			continue;
 
 		if (!signature_matches(git_commit_committer(commit), opt.committer))
@@ -435,6 +439,9 @@ static int parse_options(
 			set_sorting(s, GIT_SORT_REVERSE);
 		else if (match_str_arg(&opt->author, &args, "--author"))
 			/** Found valid --author */
+			;
+		else if (match_str_arg(&opt->excludeAuthor, &args, "--exclude-author"))
+			/** Found valid --exclude-author */
 			;
 		else if (match_str_arg(&opt->committer, &args, "--committer"))
 			/** Found valid --committer */

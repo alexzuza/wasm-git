@@ -8,6 +8,7 @@ struct branch_opts {
     int move;
     int delete;
     int set_upstream;
+    int get_default;
     char* branch1;
     char* branch2;
 };
@@ -16,56 +17,75 @@ static void parse_opts(struct branch_opts* o, int argc, char* argv[]);
 
 static void print_usage(void)
 {
-	fprintf(stderr, "usage:\n"
-		"branch -m <oldbranch> <newbranch>\n"
-		"branch -d <branch>\n"
-		"branch -u <branch>\n");
-	exit(1);
+    fprintf(stderr, "usage:\n"
+	"branch -m <oldbranch> <newbranch>\n"
+	"branch -d <branch>\n"
+	"branch -u <branch>\n"
+	"branch -default\n");
+    exit(1);
 }
 
 /*
  * git branch -m [<oldbranch>] <newbranch>
  * git branch -d <branchname>
  * git branch -u <branchname>
+ * git branch -default
  */
 int lg2_branch(git_repository* repo, int argc, char* argv[])
 {
-	struct branch_opts opt;
-	git_reference* branch1 = NULL;
-	git_reference* new_ref = NULL;
+    struct branch_opts opt;
+    git_reference* branch1 = NULL;
+    git_reference* new_ref = NULL;
+    git_buf default_branch = GIT_BUF_INIT_CONST(NULL, 0);
+    git_remote* remote = NULL;
 
-	parse_opts(&opt, argc, argv);
+    parse_opts(&opt, argc, argv);
 
-	if (opt.set_upstream && opt.branch1)
-	{
-		git_repository_head(&branch1, repo);
-		check_lg2(git_branch_set_upstream(branch1, opt.branch1), "Error change upstream", NULL);
-		printf("current branch successfully changed upstream to %s\n", opt.branch1);
-		goto cleanup;
-	}
+    if (opt.get_default)
+    {
+	    check_lg2(git_remote_lookup(&remote, repo, "origin"), "Unable to lookup remote", NULL);
+	    check_lg2(git_remote_connect(remote, GIT_DIRECTION_FETCH, NULL, NULL, NULL), "Unable to connect remote", NULL);
 
-	if (opt.branch1)
-	{
+	    int error = git_remote_default_branch(&default_branch, remote);
+	    if (error < 0)
+	    {
+		    printf("failed to get default branch: %s\n", git_error_last()->message);
+		    goto cleanup;
+	    }
+	    printf("%s\n", default_branch.ptr);
+    }
+
+    if (opt.set_upstream && opt.branch1)
+    {
+	git_repository_head(&branch1, repo);
+	check_lg2(git_branch_set_upstream(branch1, opt.branch1), "Error change upstream", NULL);
+	printf("current branch successfully changed upstream to %s\n", opt.branch1);
+	goto cleanup;
+    }
+
+    if (opt.branch1)
+    {
 	check_lg2(git_branch_lookup(&branch1, repo, opt.branch1, GIT_BRANCH_LOCAL), "Error branch lookup", NULL);
-	}
+    }
 
-	if (opt.delete && branch1)
-	{
-		check_lg2(git_branch_delete(branch1), "Error branch delete", NULL);
-		printf("%s branch was successfully deleted\n", git_reference_name(branch1));
-	}
+    if (opt.delete && branch1)
+    {
+	check_lg2(git_branch_delete(branch1), "Error branch delete", NULL);
+	printf("%s branch was successfully deleted\n", git_reference_name(branch1));
+    }
 
-	if (opt.move && branch1 && opt.branch2)
-	{
-		check_lg2(git_branch_move(&new_ref, branch1, opt.branch2, 0), "Error branch move", NULL);
-		printf("%s branch was successfully renamed to %s\n", opt.branch1, opt.branch2);
-	}
+    if (opt.move && branch1 && opt.branch2)
+    {
+	check_lg2(git_branch_move(&new_ref, branch1, opt.branch2, 0), "Error branch move", NULL);
+	printf("%s branch was successfully renamed to %s\n", opt.branch1, opt.branch2);
+    }
 
 cleanup:
-	git_reference_free(branch1);
-	git_reference_free(new_ref);
+    git_reference_free(branch1);
+    git_reference_free(new_ref);
+    git_buf_dispose(&default_branch);
 
-	return 0;
+    return 0;
 }
 
 /**
@@ -73,34 +93,36 @@ cleanup:
  */
 static void parse_opts(struct branch_opts* opt, int argc, char* argv[])
 {
-	struct args_info args = ARGS_INFO_INIT;
+    struct args_info args = ARGS_INFO_INIT;
 
-	if (argc <= 1)
+    if (argc <= 1)
+	print_usage();
+
+    memset(opt, 0, sizeof(*opt));
+
+    for (args.pos = 1; args.pos < argc; ++args.pos) {
+	char* a = argv[args.pos];
+
+	if (a[0] != '-') {
+	    if (!opt->branch1)
+		opt->branch1 = a;
+	    else if (!opt->branch2)
+		opt->branch2 = a;
+	    else
 		print_usage();
-
-	memset(opt, 0, sizeof(*opt));
-
-	for (args.pos = 1; args.pos < argc; ++args.pos) {
-		char* a = argv[args.pos];
-
-		if (a[0] != '-') {
-			if (!opt->branch1)
-				opt->branch1 = a;
-			else if (!opt->branch2)
-				opt->branch2 = a;
-			else
-				print_usage();
-		}
-		else if (!strcmp(a, "-m"))
-			opt->move = 1;
-		else if (!strcmp(a, "-d"))
-			opt->delete = 1;
-		else if (!strcmp(a, "-u"))
-			opt->set_upstream = 1;
-		else
-			print_usage();
 	}
+	else if (!strcmp(a, "-m"))
+	    opt->move = 1;
+	else if (!strcmp(a, "-d"))
+	    opt->delete = 1;
+	else if (!strcmp(a, "-u"))
+	    opt->set_upstream = 1;
+	else if (!strcmp(a, "-default"))
+	    opt->get_default = 1;
+	else
+	    print_usage();
+    }
 
-	if (opt->move && !opt->branch2)
-		print_usage();
+    if (opt->move && !opt->branch2)
+	print_usage();
 }
