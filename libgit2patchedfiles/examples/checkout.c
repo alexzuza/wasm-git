@@ -274,7 +274,7 @@ int lg2_checkout(git_repository *repo, int argc, char **argv)
 	}
 
 	if (optional_str_arg(&opt_new_branch, &args, "-b", "")) {
-		err = git_revparse_single(&target_obj, repo, "HEAD");
+		err = git_revparse_single(&target_obj, repo, (args.argc > args.pos + 1) ? argv[args.pos + 1] : "HEAD");
 		if (err != 0) {
 			fprintf(stderr, "error: %s\n", git_error_last()->message);
 			goto cleanup;
