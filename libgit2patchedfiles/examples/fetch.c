@@ -65,7 +65,7 @@ int lg2_fetch(git_repository *repo, int argc, char **argv)
 	char* input = NULL;
 
 	if (argc < 2) {
-		fprintf(stderr, "usage: %s fetch <repo>\n", argv[-1]);
+		fprintf(stderr, "usage: %s fetch <repo> [--prune]\n", argv[-1]);
 		return EXIT_FAILURE;
 	}
 
@@ -96,6 +96,10 @@ int lg2_fetch(git_repository *repo, int argc, char **argv)
 		if (git_remote_create_anonymous(&remote, repo, argv[1]) < 0)
 			goto on_error;
 
+	if (argc > 2 && !strcmp(argv[2], "--prune"))
+	{
+		fetch_opts.prune = GIT_FETCH_PRUNE;
+	}
 	/* Set up the callbacks (only update_tips for now) */
 	fetch_opts.callbacks.update_tips = &update_cb;
 	fetch_opts.callbacks.sideband_progress = &progress_cb;
