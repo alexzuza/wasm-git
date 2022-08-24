@@ -22,6 +22,7 @@
 struct blame_opts {
 	char *path;
 	char *commitspec;
+	char * contents;
 	int C;
 	int M;
 	int start_line;
@@ -67,6 +68,10 @@ int lg2_blame(git_repository *repo, int argc, char *argv[])
 
 	/** Run the blame. */
 	check_lg2(git_blame_file(&blame, repo, o.path, &blameopts), "Blame error", NULL);
+	if (o.contents) {
+		// https://blog.scitools.com/getting-git-blame/
+		check_lg2(git_blame_buffer(&blame, blame, o.contents, strlen(o.contents)), "Blame contents error", NULL);
+	}
 
 	/**
 	 * Get the raw data inside the blob for output. We use the
@@ -85,6 +90,10 @@ int lg2_blame(git_repository *repo, int argc, char *argv[])
 
 	rawdata = git_blob_rawcontent(blob);
 	rawsize = git_blob_rawsize(blob);
+	if (o.contents) {
+		rawdata = o.contents;
+		rawsize = strlen(o.contents);
+	}
 
 	/** Produce the output. */
 	line = 1;
@@ -93,6 +102,11 @@ int lg2_blame(git_repository *repo, int argc, char *argv[])
 	while (i < rawsize) {
 		const char *eol = memchr(rawdata + i, '\n', (size_t)(rawsize - i));
 		char oid[10] = {0};
+		if (o.end_line > 1 && (line < o.start_line || line >= o.end_line)) {
+			i = (int)(eol - rawdata + 1);
+			line++;
+			continue;
+		}
 		const git_blame_hunk *hunk = git_blame_get_hunk_byline(blame, line);
 
 		if (break_on_null_hunk && !hunk)
@@ -103,7 +117,11 @@ int lg2_blame(git_repository *repo, int argc, char *argv[])
 			break_on_null_hunk = 1;
 
 			git_oid_tostr(oid, 10, &hunk->final_commit_id);
-			snprintf(sig, 100, "%s <%s>", hunk->final_signature->name, hunk->final_signature->email);
+			if (hunk->final_signature) {
+				snprintf(sig, 100, "%s <%s>", hunk->final_signature->name, hunk->final_signature->email);
+			} else {
+				snprintf(sig, 100, "%s <%s>", "You", "your@email.com");
+		 	}
 
 			printf("%s ( %-30s %3d) %.*s\n",
 					oid,
@@ -150,11 +168,11 @@ static void parse_opts(struct blame_opts *o, int argc, char *argv[])
 
 	if (argc < 2) usage(NULL, NULL);
 
-	for (i=1; i<argc; i++) {
+	for (i = 1; i < argc; i++) {
 		char *a = argv[i];
 
 		if (a[0] != '-') {
-			int i=0;
+			int i = 0;
 			while (bare_args[i] && i < 3) ++i;
 			if (i >= 3)
 				usage("Invalid argument set", NULL);
@@ -168,6 +186,11 @@ static void parse_opts(struct blame_opts *o, int argc, char *argv[])
 			o->C = 1;
 		else if (!strcasecmp(a, "-F"))
 			o->F = 1;
+		else if (!strcasecmp(a, "--contents")) {
+				i++;
+				a = argv[i];
+				o->contents = a;
+		}
 		else if (!strcasecmp(a, "-L")) {
 			i++; a = argv[i];
 			if (i >= argc) fatal("Not enough arguments to -L", NULL);
