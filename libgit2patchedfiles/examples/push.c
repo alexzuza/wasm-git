@@ -17,6 +17,7 @@
 struct push_opts {
 	char* refspec;
 };
+static int push_update_reference_callback(const char* refname, const char* status, void* data);
 static void parse_opts(struct push_opts* o, int argc, char* argv[]);
 
 static void print_usage(void)
@@ -58,6 +59,7 @@ int lg2_push(git_repository* repo, int argc, char** argv) {
 	check_lg2(git_remote_lookup(&remote, repo, "origin"), "Unable to lookup remote", NULL);
 
 	check_lg2(git_push_options_init(&options, GIT_PUSH_OPTIONS_VERSION), "Error initializing push", NULL);
+	options.callbacks.push_update_reference = push_update_reference_callback;
 
 	check_lg2(git_remote_push(remote, &refspecs, &options), "Error pushing", NULL);
 	printf("Successfully pushed to %s\n", refspec);
@@ -65,6 +67,17 @@ int lg2_push(git_repository* repo, int argc, char** argv) {
 	git_reference_free(head_ref);
 
 	return 0;
+}
+
+static int push_update_reference_callback(const char* refname, const char* status, void* data)
+{
+    if (status)
+    {
+	    fprintf(stderr, "%s\n", status);
+	    exit(1);
+    }
+
+    return 0;
 }
 
 /**
