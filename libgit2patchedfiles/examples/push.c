@@ -74,7 +74,7 @@ int lg2_push(git_repository* repo, int argc, char** argv) {
 
 static int sideband_progress_callback(const char* str, int len, void* payload)
 {
-    if (strstr(str, "ERR") || strstr(str, "403"))
+    if (strstr(str, "ERR") || strstr(str, "403") || strstr(str, "422"))
     {
 	    fprintf(stderr, "%s\n", str);
     }
