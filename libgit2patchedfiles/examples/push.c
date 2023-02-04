@@ -20,7 +20,7 @@ struct push_opts {
 static int push_update_reference_callback(const char* refname, const char* status, void* data);
 static int sideband_progress_callback(const char* str, int len, void* payload);
 static void parse_opts(struct push_opts* o, int argc, char* argv[]);
-
+static int push_error = 0;
 static void print_usage(void)
 {
 	fprintf(stderr, "usage:\n"
@@ -41,6 +41,7 @@ int lg2_push(git_repository* repo, int argc, char** argv) {
 	char* refspec = NULL;
 	git_reference* head_ref = NULL;
 
+	push_error = 0;
 	parse_opts(&opt, argc, argv);
 
 	if (opt.refspec)
@@ -74,9 +75,10 @@ int lg2_push(git_repository* repo, int argc, char** argv) {
 
 static int sideband_progress_callback(const char* str, int len, void* payload)
 {
-    if (strstr(str, "ERR") || strstr(str, "403") || strstr(str, "422"))
+    if (strstr(str, "ERR") || push_error)
     {
-	    fprintf(stderr, "%s\n", str);
+	    push_error = 1;
+	    fputs(str, stderr);
     }
     
     return 0;
